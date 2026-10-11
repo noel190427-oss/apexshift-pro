@@ -1632,4 +1632,118 @@ input:checked + .switch-slider:before {
   height: 28px;
 }
 
+/* SERVER PICKER & REMOTE CONNECTION */
+.server-picker-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-server-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+}
+
+.btn-server-toggle:hover {
+  background: rgba(0, 240, 255, 0.2);
+  border-color: rgba(0, 240, 255, 0.6);
+}
+
+.server-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  background: #141824;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 240, 255, 0.15);
+  border-radius: 8px;
+  padding: 14px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.server-picker-dropdown.hidden {
+  display: none !important;
+}
+
+.server-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}
+
+.btn-close:hover {
+  color: #fff;
+}
+
+.server-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-preset {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #eee;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-preset:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.5);
+  color: #00f0ff;
+}
+
+.btn-preset.active {
+  background: rgba(0, 255, 136, 0.2);
+  border-color: #00ff88;
+  color: #00ff88;
+  font-weight: 600;
+}
+
+.server-custom-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+
+.server-custom-input label {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.server-custom-input small {
+  font-size: 10px;
+  color: #777;
+  line-height: 1.3;
+}
+
 

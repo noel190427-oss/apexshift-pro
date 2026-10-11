@@ -73,6 +73,23 @@ const BUILTIN_PROFILE_KEYS = Object.keys(PROFILES);
 let currentProfileKey = 'porsche';
 let webConfigLoaded = false;   // erst nach dem Laden vom Server automatisch speichern
 
+// Server-Adresse Management (Für Zugriff aus anderer Stadt / lokal / Pi)
+const IS_GITHUB_PAGES = window.location.hostname.includes('github.io');
+let customServerBase = localStorage.getItem('apexshift_server_url') || (IS_GITHUB_PAGES ? 'http://192.168.2.124:5305' : '');
+
+function getApiBaseUrl() {
+  if (customServerBase && customServerBase !== 'auto') {
+    return customServerBase.replace(/\/+$/, '');
+  }
+  return '';
+}
+
+function apiUrl(endpoint) {
+  const base = getApiBaseUrl();
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return base ? `${base}${path}` : path;
+}
+
 // Aktiver Konfigurationszustand
 let activeConfig = {
   ...PROFILES.porsche,
@@ -201,7 +218,7 @@ let customProfiles = {};
 // Sendet Lenkrad-Einstellungen, Profil und Reifen an den Server (wird dort gespeichert)
 function notifyWheelConfig() {
   if (!webConfigLoaded) return Promise.resolve();
-  return fetch('/api/config', {
+  return fetch(apiUrl('/api/config'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1025,42 +1042,53 @@ function updateTireNode(node, tempEl, slipEl, tempC, slipVal) {
 // ------------------------------------------------------------
 let packetCountInWindow = 0;
 let lastPacketCountReset = performance.now();
+let eventSource = null;
 
 function connectTelemetryStream() {
-  const es = new EventSource('/api/stream');
+  if (eventSource) {
+    try { eventSource.close(); } catch (_) {}
+    eventSource = null;
+  }
 
-  es.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
+  try {
+    const streamUrl = apiUrl('/api/stream');
+    eventSource = new EventSource(streamUrl);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (!isSimulatorActive) {
+          telemetryState = data;
+          updateDashboardUI(telemetryState);
+
+          // Status aktualisieren
+          connectionPill.className = 'status-pill connected';
+          connectionText.textContent = 'Forza verbunden (Live)';
+        }
+
+        // Paket-Rate messen
+        packetCountInWindow++;
+        const now = performance.now();
+        if (now - lastPacketCountReset >= 1000) {
+          packetRate.textContent = `${packetCountInWindow} Hz`;
+          packetCountInWindow = 0;
+          lastPacketCountReset = now;
+        }
+      } catch (e) {
+        console.error('Telemetrie Parse Fehler:', e);
+      }
+    };
+
+    eventSource.onerror = () => {
       if (!isSimulatorActive) {
-        telemetryState = data;
-        updateDashboardUI(telemetryState);
-
-        // Status aktualisieren
-        connectionPill.className = 'status-pill connected';
-        connectionText.textContent = 'Forza verbunden (Live)';
+        connectionPill.className = 'status-pill waiting';
+        connectionText.textContent = 'Warte auf Forza...';
+        packetRate.textContent = '0 Hz';
       }
-
-      // Paket-Rate messen
-      packetCountInWindow++;
-      const now = performance.now();
-      if (now - lastPacketCountReset >= 1000) {
-        packetRate.textContent = `${packetCountInWindow} Hz`;
-        packetCountInWindow = 0;
-        lastPacketCountReset = now;
-      }
-    } catch (e) {
-      console.error('Telemetrie Parse Fehler:', e);
-    }
-  };
-
-  es.onerror = () => {
-    if (!isSimulatorActive) {
-      connectionPill.className = 'status-pill waiting';
-      connectionText.textContent = 'Warte auf Forza...';
-      packetRate.textContent = '0 Hz';
-    }
-  };
+    };
+  } catch (err) {
+    console.warn('EventSource Fehler:', err);
+  }
 }
 
 // ------------------------------------------------------------
@@ -1481,7 +1509,7 @@ function setupSettingInputs() {
   const wheelTestBtn = document.getElementById('wheelTestBtn');
   if (wheelTestBtn) {
     wheelTestBtn.addEventListener('click', () => {
-      fetch('/api/config', {
+      fetch(apiUrl('/api/config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ wheelTest: Date.now() })
@@ -1496,7 +1524,7 @@ function setupSettingInputs() {
       return;
     }
     try {
-      const res = await fetch('/api/config', {
+      const res = await fetch(apiUrl('/api/config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ port })
@@ -1517,7 +1545,7 @@ function setupSettingInputs() {
 // ------------------------------------------------------------
 async function loadWheelConfigFromServer() {
   try {
-    const cfg = await (await fetch('/api/config')).json();
+    const cfg = await (await fetch(apiUrl('/api/config'))).json();
 
     // Eigene Profile + zuletzt aktives Profil wiederherstellen
     customProfiles = cfg.customProfiles || {};
@@ -1555,7 +1583,7 @@ function startBridgeStatusPolling() {
 
   const update = async () => {
     try {
-      const s = await (await fetch('/api/bridge-status')).json();
+      const s = await (await fetch(apiUrl('/api/bridge-status'))).json();
       if (!s.bridgeRunning) {
         pill.className = 'status-pill waiting';
         text.textContent = 'Lenkrad-Bridge nicht gestartet (Start_ApexShift.bat)';
@@ -1626,11 +1654,11 @@ function syncSettingsToInputs() {
 // ------------------------------------------------------------
 function startWebPresence() {
   // Sofort beim Öffnen anmelden
-  fetch('/api/web-ping').catch(() => {});
+  fetch(apiUrl('/api/web-ping')).catch(() => {});
 
   // Alle 800ms Heartbeat senden, solange der Tab geöffnet ist
   const pingInterval = setInterval(() => {
-    fetch('/api/web-ping').catch(() => {});
+    fetch(apiUrl('/api/web-ping')).catch(() => {});
   }, 800);
 
   // Sobald der Tab / das Fenster geschlossen wird -> Sofort dem Server Bescheid geben
@@ -1640,10 +1668,11 @@ function startWebPresence() {
       if (eventSource) {
         try { eventSource.close(); } catch (_) {}
       }
+      const closeEndpoint = apiUrl('/api/web-close');
       if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/web-close');
+        navigator.sendBeacon(closeEndpoint);
       } else {
-        fetch('/api/web-close', { method: 'POST', keepalive: true });
+        fetch(closeEndpoint, { method: 'POST', keepalive: true }).catch(() => {});
       }
     } catch (_) {}
   };
@@ -1654,7 +1683,7 @@ function startWebPresence() {
   // Wenn der Tab wieder sichtbar wird (z. B. nach Wechsel) sofort pingen
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      fetch('/api/web-ping').catch(() => {});
+      fetch(apiUrl('/api/web-ping')).catch(() => {});
     }
   });
 }
@@ -1671,7 +1700,7 @@ async function loadServerInfo() {
   const isGitHubPages = window.location.hostname.includes('github.io');
 
   try {
-    const res = await fetch('/api/server-info');
+    const res = await fetch(apiUrl('/api/server-info'));
     if (!res.ok) throw new Error('Not available');
     const info = await res.json();
 
@@ -1731,12 +1760,112 @@ function setupCopyButtons(primaryIp, udpPort) {
 }
 
 // ------------------------------------------------------------
-// 9. STARTUP
+// 9. SERVER PICKER UI (Für andere Städte, Pi oder Lokal)
+// ------------------------------------------------------------
+function setupServerPicker() {
+  const wrap = document.getElementById('serverPickerWrap');
+  const btn = document.getElementById('serverPickerBtn');
+  const dropdown = document.getElementById('serverPickerDropdown');
+  const closeBtn = document.getElementById('serverPickerClose');
+  const label = document.getElementById('serverPickerLabel');
+  const customInput = document.getElementById('customServerUrlInput');
+  const applyBtn = document.getElementById('applyServerUrlBtn');
+
+  if (!btn || !dropdown) return;
+
+  const updateLabel = () => {
+    if (!customServerBase || customServerBase === 'auto') {
+      label.textContent = 'Server: Auto';
+    } else if (customServerBase.includes('192.168.2.124')) {
+      label.textContent = 'Server: Pi (192.168.2.124)';
+    } else if (customServerBase.includes('localhost') || customServerBase.includes('127.0.0.1')) {
+      label.textContent = 'Server: Lokal (PC)';
+    } else {
+      try {
+        const u = new URL(customServerBase);
+        label.textContent = `Server: ${u.hostname}`;
+      } catch (_) {
+        label.textContent = `Server: Eigene IP`;
+      }
+    }
+
+    // Presets optisch hervorheben
+    document.querySelectorAll('.btn-preset').forEach(p => {
+      const u = p.dataset.url;
+      if ((u === 'auto' && (!customServerBase || customServerBase === 'auto')) || u === customServerBase) {
+        p.classList.add('active');
+      } else {
+        p.classList.remove('active');
+      }
+    });
+
+    if (customInput && customServerBase && customServerBase !== 'auto') {
+      customInput.value = customServerBase;
+    }
+  };
+
+  updateLabel();
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+  });
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => dropdown.classList.add('hidden'));
+  }
+
+  document.addEventListener('click', (e) => {
+    if (wrap && !wrap.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  // Klick auf Preset-Buttons
+  document.querySelectorAll('.btn-preset').forEach(preset => {
+    preset.addEventListener('click', () => {
+      const targetUrl = preset.dataset.url;
+      customServerBase = targetUrl;
+      localStorage.setItem('apexshift_server_url', targetUrl);
+      updateLabel();
+      dropdown.classList.add('hidden');
+      reconnectAll();
+    });
+  });
+
+  // Klick auf "Verbinden" bei eigenem Server
+  if (applyBtn && customInput) {
+    applyBtn.addEventListener('click', () => {
+      let val = customInput.value.trim();
+      if (!val) return;
+      if (!val.startsWith('http://') && !val.startsWith('https://')) {
+        val = `http://${val}`;
+      }
+      customServerBase = val;
+      localStorage.setItem('apexshift_server_url', val);
+      updateLabel();
+      dropdown.classList.add('hidden');
+      reconnectAll();
+    });
+  }
+}
+
+function reconnectAll() {
+  console.log('[ApexShift] Verbinde neu mit Server:', getApiBaseUrl() || 'Lokaler Ursprung');
+  connectTelemetryStream();
+  loadWheelConfigFromServer();
+  loadServerInfo();
+  fetch(apiUrl('/api/web-ping')).catch(() => {});
+}
+
+// ------------------------------------------------------------
+// 10. STARTUP
 // ------------------------------------------------------------
 window.addEventListener('DOMContentLoaded', () => {
   initShiftLightLeds();
   initTyrePills();
   setupEventListeners();
+  setupServerPicker();
   syncSettingsToInputs();
   connectTelemetryStream();
   loadWheelConfigFromServer();
@@ -1744,3 +1873,4 @@ window.addEventListener('DOMContentLoaded', () => {
   startWebPresence();
   loadServerInfo();
 });
+

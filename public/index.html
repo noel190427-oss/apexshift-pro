@@ -48,8 +48,34 @@
       <span id="headerTyreLabel">Reifen: Semi-Slick</span>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Quick Actions & Remote Server Connection -->
     <div class="top-actions">
+      <!-- Remote Server Picker (Für Zugriff aus einer anderen Stadt oder lokal) -->
+      <div class="server-picker-wrap" id="serverPickerWrap">
+        <button id="serverPickerBtn" class="btn btn-secondary btn-server-toggle" title="Server-Verbindung wählen (Pi, Lokal oder Eigene IP)">
+          <span class="icon">🌐</span> <span id="serverPickerLabel">Server: Auto</span>
+        </button>
+        <div class="server-picker-dropdown hidden" id="serverPickerDropdown">
+          <div class="server-picker-header">
+            <span>📡 Telemetrie-Server wählen</span>
+            <button id="serverPickerClose" class="btn-close" type="button">✕</button>
+          </div>
+          <div class="server-presets">
+            <button class="btn btn-preset" data-url="http://192.168.2.124:5305" type="button">🍓 Raspberry Pi (192.168.2.124)</button>
+            <button class="btn btn-preset" data-url="http://localhost:5305" type="button">💻 Lokaler PC (localhost)</button>
+            <button class="btn btn-preset" data-url="auto" type="button">🔄 Automatisch (gleicher Host)</button>
+          </div>
+          <div class="server-custom-input">
+            <label for="customServerUrlInput">Eigene Server-Adresse (z. B. aus anderer Stadt / DynDNS):</label>
+            <div class="input-with-btn">
+              <input type="text" id="customServerUrlInput" placeholder="http://meine-ip:5305" class="form-input">
+              <button id="applyServerUrlBtn" class="btn btn-primary" type="button">Verbinden</button>
+            </div>
+            <small>Hier kann jeder Spieler die IP-Adresse des Servers eintragen, um die Telemetrie live zu sehen.</small>
+          </div>
+        </div>
+      </div>
+
       <button id="inGameOverlayBtn" class="btn btn-accent" title="Schwebendes HUD über Forza Horizon anzeigen">
         <span class="icon">🎯</span> In-Game HUD
       </button>

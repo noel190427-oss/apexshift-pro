@@ -372,6 +372,17 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+  // CORS Preflight für Web-Zugriffe von GitHub Pages / externen Domains
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   // SSE Telemetry Stream
