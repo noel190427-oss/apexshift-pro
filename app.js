@@ -1663,12 +1663,17 @@ function startWebPresence() {
 // 8. SERVER-INFO & FORZA-SETUP (IP & Port automatisch ermitteln)
 // ------------------------------------------------------------
 async function loadServerInfo() {
+  const ipEl = document.getElementById('forzaServerIp');
+  const portEl = document.getElementById('forzaServerPort');
+  const udpDisplay = document.getElementById('udpPortDisplay');
+
+  // Falls auf GitHub Pages gehostet: Vorschlag oder lokale IP anzeigen
+  const isGitHubPages = window.location.hostname.includes('github.io');
+
   try {
     const res = await fetch('/api/server-info');
+    if (!res.ok) throw new Error('Not available');
     const info = await res.json();
-    const ipEl = document.getElementById('forzaServerIp');
-    const portEl = document.getElementById('forzaServerPort');
-    const udpDisplay = document.getElementById('udpPortDisplay');
 
     if (ipEl && info.primaryIp) {
       ipEl.textContent = info.primaryIp;
@@ -1680,37 +1685,49 @@ async function loadServerInfo() {
       udpDisplay.textContent = `UDP: ${info.udpPort}`;
     }
 
-    const showCopyFeedback = (el) => {
-      if (!el) return;
-      el.classList.add('copied');
-      setTimeout(() => el.classList.remove('copied'), 1500);
+    setupCopyButtons(info.primaryIp, info.udpPort);
+  } catch (_) {
+    // Fallback wenn kein Backend direkt auf dieser Domain läuft (z.B. GitHub Pages)
+    const fallbackIp = isGitHubPages ? '192.168.2.124' : (window.location.hostname || '127.0.0.1');
+    const fallbackPort = 5300;
+    if (ipEl) ipEl.textContent = fallbackIp;
+    if (portEl) portEl.textContent = fallbackPort;
+    if (udpDisplay) udpDisplay.textContent = `UDP: ${fallbackPort}`;
+    setupCopyButtons(fallbackIp, fallbackPort);
+  }
+}
+
+function setupCopyButtons(primaryIp, udpPort) {
+  const showCopyFeedback = (el) => {
+    if (!el) return;
+    el.classList.add('copied');
+    setTimeout(() => el.classList.remove('copied'), 1500);
+  };
+
+  const ipBox = document.getElementById('forzaIpBox');
+  const portBox = document.getElementById('forzaPortBox');
+  const copyBtn = document.getElementById('copyForzaBtn');
+
+  if (ipBox) {
+    ipBox.onclick = () => {
+      if (!primaryIp) return;
+      navigator.clipboard.writeText(primaryIp).then(() => showCopyFeedback(ipBox)).catch(() => {});
     };
+  }
 
-    const ipBox = document.getElementById('forzaIpBox');
-    const portBox = document.getElementById('forzaPortBox');
-    const copyBtn = document.getElementById('copyForzaBtn');
+  if (portBox) {
+    portBox.onclick = () => {
+      if (!udpPort) return;
+      navigator.clipboard.writeText(String(udpPort)).then(() => showCopyFeedback(portBox)).catch(() => {});
+    };
+  }
 
-    if (ipBox) {
-      ipBox.addEventListener('click', () => {
-        if (!info.primaryIp) return;
-        navigator.clipboard.writeText(info.primaryIp).then(() => showCopyFeedback(ipBox)).catch(() => {});
-      });
-    }
-
-    if (portBox) {
-      portBox.addEventListener('click', () => {
-        if (!info.udpPort) return;
-        navigator.clipboard.writeText(String(info.udpPort)).then(() => showCopyFeedback(portBox)).catch(() => {});
-      });
-    }
-
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        const text = `Forza Horizon Einstellungen:\nDatenweitergabe: EIN\nIP-Adresse: ${info.primaryIp}\nPort: ${info.udpPort}`;
-        navigator.clipboard.writeText(text).then(() => showCopyFeedback(copyBtn)).catch(() => {});
-      });
-    }
-  } catch (_) {}
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      const text = `Forza Horizon Einstellungen:\nDatenweitergabe: EIN\nIP-Adresse: ${primaryIp}\nPort: ${udpPort}`;
+      navigator.clipboard.writeText(text).then(() => showCopyFeedback(copyBtn)).catch(() => {});
+    };
+  }
 }
 
 // ------------------------------------------------------------
