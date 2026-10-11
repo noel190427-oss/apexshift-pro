@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ApexShift - In-Game HUD (Always on Top)</title>
+  <style>
+    :root {
+      --accent-cyan: #00f0ff;
+      --accent-red: #ff2a4b;
+      --accent-green: #00ff66;
+      --accent-yellow: #ffcc00;
+      --accent-blue: #3a75ff;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: rgba(10, 12, 16, 0.92);
+      color: #fff;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8px 14px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 8px;
+    }
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #8b9bb4;
+      margin-bottom: 6px;
+      font-family: monospace;
+    }
+    .hud-title {
+      color: var(--accent-cyan);
+      letter-spacing: 1px;
+    }
+    /* 16 SHIFT LIGHT LEDS */
+    .shift-bar {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 8px;
+    }
+    .led {
+      height: 20px;
+      border-radius: 3px;
+      background: #141822;
+      border: 1px solid #1f2737;
+      transition: background 0.05s ease, box-shadow 0.05s ease;
+    }
+    .led.lit-green {
+      background: #00e650;
+      box-shadow: 0 0 12px #00e650;
+      border-color: #66ff99;
+    }
+    .led.lit-yellow {
+      background: #ffcc00;
+      box-shadow: 0 0 12px #ffcc00;
+      border-color: #ffe680;
+    }
+    .led.lit-red {
+      background: #ff1a3c;
+      box-shadow: 0 0 14px #ff1a3c;
+      border-color: #ff8093;
+    }
+    .led.lit-blue {
+      background: #2b70ff;
+      box-shadow: 0 0 14px #2b70ff;
+      border-color: #8bb2ff;
+    }
+    /* METRICS ROW */
+    .hud-stats {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 0 6px;
+    }
+    .gear-box {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .gear-val {
+      font-size: 38px;
+      font-weight: 900;
+      line-height: 1;
+      color: #fff;
+    }
+    .gear-val.shift-flash {
+      color: var(--accent-red);
+      text-shadow: 0 0 14px rgba(255, 42, 75, 0.9);
+      animation: pulse 0.15s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); }
+    }
+    .speed-box {
+      font-size: 32px;
+      font-weight: 900;
+      font-family: monospace;
+      color: #fff;
+    }
+    .unit {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-left: 2px;
+    }
+    .rpm-text {
+      font-size: 13px;
+      font-family: monospace;
+      font-weight: 700;
+      color: #8b9bb4;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-header">
+    <span class="hud-title">🏁 APEXSHIFT HUD</span>
+    <span id="hudTyreText" style="color: var(--accent-cyan); font-size: 11px; letter-spacing: 0.5px;">🛞 Semi-Slick</span>
+    <span id="hudLcText" style="font-size: 10px; font-weight: 800; color: #00f0ff;">⚡ LC: AN</span>
+    <span id="hudRpmText" class="rpm-text">0 RPM</span>
+  </div>
+
+  <div id="hudShiftBar" class="shift-bar">
+    <!-- 16 LEDs -->
+  </div>
+
+  <div class="hud-stats">
+    <div class="gear-box">
+      <span style="font-size: 11px; font-weight: 800; color: #8b9bb4;">GANG</span>
+      <span id="hudGearVal" class="gear-val">N</span>
+    </div>
+    <div class="speed-box">
+      <span id="hudSpeedVal">0</span><span class="unit">KM/H</span>
+    </div>
+  </div>
+
+  <script>
+    // 16 LEDs aufbauen
+    const bar = document.getElementById('hudShiftBar');
+    for (let i = 0; i < 16; i++) {
+      const led = document.createElement('div');
+      led.className = 'led';
+      bar.appendChild(led);
+    }
+
+    const leds = bar.children;
+    const hudRpmText = document.getElementById('hudRpmText');
+    const hudGearVal = document.getElementById('hudGearVal');
+    const hudSpeedVal = document.getElementById('hudSpeedVal');
+
+    let blinkState = true;
+    setInterval(() => { blinkState = !blinkState; }, 60);
+
+    // Telemetrie von Server-Sent Events empfangen
+    const es = new EventSource('/api/stream');
+    es.onmessage = (event) => {
+      try {
+        const t = JSON.parse(event.data);
+        hudRpmText.textContent = `${t.currentEngineRpm} RPM`;
+        hudGearVal.textContent = t.gearDisplay;
+        hudSpeedVal.textContent = t.speedKmh;
+
+        if (t.launchControlEnabled !== undefined) {
+          const lcEl = document.getElementById('hudLcText');
+          if (lcEl) {
+            lcEl.textContent = t.launchControlEnabled ? '⚡ LC: AN' : '🚫 LC: AUS';
+            lcEl.style.color = t.launchControlEnabled ? '#00f0ff' : '#ff4766';
+          }
+        }
+
+        const isShift = t.rpmPercent >= 88;
+        if (isShift) {
+          hudGearVal.classList.add('shift-flash');
+        } else {
+          hudGearVal.classList.remove('shift-flash');
+        }
+
+        // LEDs Outside-In berechnen
+        const progress = Math.min(1, Math.max(0, (t.rpmPercent - 55) / (88 - 55)));
+        for (let i = 0; i < 16; i++) {
+          const dist = i < 8 ? i : 15 - i;
+          const lit = dist < Math.round(progress * 8);
+          leds[i].className = 'led';
+
+          if (lit) {
+            let col = 'lit-green';
+            if (dist >= 6) col = 'lit-red';
+            else if (dist >= 4) col = 'lit-yellow';
+
+            if (isShift && !blinkState) {
+              // Aus im Blinktakt
+            } else {
+              leds[i].classList.add(col);
+            }
+          }
+        }
+      } catch (_) {}
+    };
+
+    const tyreNames = {
+      street: 'Straße', sport: 'Sport', 'semi-slick': 'Semi-Slick', slick: 'Slick',
+      rally: 'Rally', offroad: 'Offroad', drift: 'Drift', snow: 'Schnee', drag: 'Drag'
+    };
+    const updateTyreConfig = async () => {
+      try {
+        const cfg = await (await fetch('/api/config')).json();
+        if (cfg.tyre && tyreNames[cfg.tyre]) {
+          document.getElementById('hudTyreText').textContent = `🛞 ${tyreNames[cfg.tyre]}`;
+        }
+      } catch (_) {}
+    };
+    updateTyreConfig();
+    setInterval(updateTyreConfig, 2500);
+
+    // Web-Präsenz für Lenkrad-LEDs
+    fetch('/api/web-ping').catch(() => {});
+    const ovPing = setInterval(() => { fetch('/api/web-ping').catch(() => {}); }, 800);
+    const sendOverlayClose = () => {
+      try {
+        clearInterval(ovPing);
+        if (eventSource) { try { eventSource.close(); } catch (_) {} }
+        if (navigator.sendBeacon) navigator.sendBeacon('/api/web-close');
+        else fetch('/api/web-close', { method: 'POST', keepalive: true });
+      } catch (_) {}
+    };
+    window.addEventListener('beforeunload', sendOverlayClose);
+    window.addEventListener('pagehide', sendOverlayClose);
+  </script>
+</body>
+</html>

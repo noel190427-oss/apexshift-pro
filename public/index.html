@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ApexShift Pro - Forza Horizon Telemetry & Shift Lights</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-carbon">
+
+  <!-- TOP HEADER / STATUS BAR -->
+  <header class="top-bar">
+    <div class="brand">
+      <span class="brand-logo">🏁</span>
+      <span class="brand-title">APEX<span class="highlight">SHIFT</span> PRO</span>
+      <span class="badge-version">v2.0</span>
+    </div>
+
+    <!-- Live Status Pill -->
+    <div class="status-container">
+      <div id="connectionPill" class="status-pill waiting">
+        <span class="status-dot"></span>
+        <span id="connectionText">Warte auf Forza...</span>
+      </div>
+      <div class="telemetry-stats">
+        <span id="packetRate">0 Hz</span>
+        <span class="divider">|</span>
+        <span id="udpPortDisplay">UDP: 5300</span>
+      </div>
+    </div>
+
+    <!-- Profile Selector -->
+    <div class="profile-controls">
+      <label for="profileSelect">Profil:</label>
+      <select id="profileSelect">
+        <option value="gt3">Porsche GT3 Cup</option>
+        <option value="f1">Formula 1 Style</option>
+        <option value="g923">Logitech G923 Classic</option>
+        <option value="drift">Formula Drift</option>
+        <option value="hypercar">Hypercar Le Mans</option>
+        <option value="custom">Benutzerdefiniert</option>
+      </select>
+    </div>
+
+    <!-- Aktiver Reifen im Header -->
+    <div class="header-tyre-badge" id="headerTyrePill" title="Aktuell montierte Reifenmischung">
+      <span class="icon">🛞</span>
+      <span id="headerTyreLabel">Reifen: Semi-Slick</span>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="top-actions">
+      <button id="inGameOverlayBtn" class="btn btn-accent" title="Schwebendes HUD über Forza Horizon anzeigen">
+        <span class="icon">🎯</span> In-Game HUD
+      </button>
+      <button id="simModeBtn" class="btn btn-secondary" title="Test-Simulator aktivieren">
+        <span class="icon">🎮</span> Test-Modus
+      </button>
+      <button id="soundToggleBtn" class="btn btn-secondary active" title="Audio Shift-Beep an/aus">
+        <span id="soundIcon" class="icon">🔊</span> Beep
+      </button>
+      <button id="viewToggleBtn" class="btn btn-primary" title="Zwischen Dashboard und Einstellungen wechseln">
+        <span id="viewIcon" class="icon">⚙️</span> Einstellungen
+      </button>
+      <button id="fullscreenBtn" class="btn btn-icon" title="Vollbildmodus (F11)">
+        ⛶
+      </button>
+    </div>
+  </header>
+
+  <!-- SIMULATOR CONTROL BAR (Wird im Test-Modus eingeblendet) -->
+  <div id="simBar" class="sim-bar hidden">
+    <div class="sim-content">
+      <span class="sim-badge">TEST-SIMULATOR AKTIV</span>
+      <label>Drehzahl testen:</label>
+      <input type="range" id="simRpmSlider" min="0" max="100" value="0">
+      <span id="simRpmLabel" class="sim-val">0 % (0 RPM)</span>
+      <button id="simGasBtn" class="btn btn-accent">🔥 VOLLGAS DRÜCKEN</button>
+      <button id="simCircleBtn" class="btn btn-secondary" title="Taste 'C' gedrückt halten simuliert auch Kreis">⭕ KREIS HALTEN (LC)</button>
+      <button id="simClutchBtn" class="btn btn-secondary" title="Taste 'X' zum Kuppeln (4x schnell = LC sperren)">🦶 KUPPLUNG (X)</button>
+      <button id="simBrakeBtn" class="btn btn-secondary" title="Taste 'S' zum Bremsen">🛑 BREMSE (S)</button>
+      <div class="sim-gears">
+        <label>Gang:</label>
+        <button class="gear-btn active" data-gear="1">1</button>
+        <button class="gear-btn" data-gear="2">2</button>
+        <button class="gear-btn" data-gear="3">3</button>
+        <button class="gear-btn" data-gear="4">4</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="main-container">
+
+    <!-- 1. DASHBOARD VIEW (DDU) -->
+    <section id="dashboardView" class="view-panel active-view">
+      
+      <!-- FORZA CONNECTION BANNER (Zeigt automatisch IP & Port für Forza Horizon) -->
+      <div class="forza-setup-bar" id="forzaSetupBar">
+        <div class="setup-badge">
+          <span class="setup-icon">🎮</span>
+          <span class="setup-title">In Forza Horizon eingeben:</span>
+        </div>
+        <div class="setup-fields">
+          <div class="setup-field-box">
+            <span class="setup-field-lbl">Datenweitergabe:</span>
+            <span class="setup-field-val tag-on">EIN</span>
+          </div>
+          <div class="setup-field-box copyable" id="forzaIpBox" title="Klicken zum Kopieren">
+            <span class="setup-field-lbl">IP-Adresse:</span>
+            <span class="setup-field-val highlight" id="forzaServerIp">Laden...</span>
+          </div>
+          <div class="setup-field-box copyable" id="forzaPortBox" title="Klicken zum Kopieren">
+            <span class="setup-field-lbl">Port:</span>
+            <span class="setup-field-val highlight" id="forzaServerPort">5300</span>
+          </div>
+          <button id="copyForzaBtn" class="btn btn-secondary btn-sm" type="button" title="IP und Port in die Zwischenablage kopieren">
+            📋 Kopieren
+          </button>
+        </div>
+      </div>
+
+      <!-- SHIFT LIGHT BAR (16 Hochauflösende LEDs) -->
+      <div class="shift-light-wrapper">
+        <div class="rpm-meta-top">
+          <span id="idleRpmDisplay">IDLE: 900</span>
+          <span id="liveRpmDisplay" class="rpm-live-highlight">0 RPM</span>
+          <span id="maxRpmDisplay">MAX: 8500</span>
+        </div>
+        
+        <!-- LOGITECH G AUTHENTIC LENKRAD RPM-LEDS (5 LEDs: 2x Grün, 2x Gelb, 1x Rot) -->
+        <div class="logitech-wheel-strip" id="logitechWheelStrip" title="Logitech G923 / G29 Lenkrad RPM-Lichter (Standard-Modus)">
+          <div class="logi-logo-wrap">
+            <span class="logi-g-icon">G</span>
+            <span class="logi-title">LOGITECH G</span>
+            <span class="logi-subtitle">LENKRAD RPM-LEDS</span>
+          </div>
+          <div class="logi-leds-cluster" id="logiLedsCluster">
+            <div class="logi-led logi-green" id="logiLed0" title="LED 1 (Grün)"></div>
+            <div class="logi-led logi-green" id="logiLed1" title="LED 2 (Grün)"></div>
+            <div class="logi-led logi-amber" id="logiLed2" title="LED 3 (Gelb)"></div>
+            <div class="logi-led logi-amber" id="logiLed3" title="LED 4 (Gelb)"></div>
+            <div class="logi-led logi-red" id="logiLed4" title="LED 5 (Rot)"></div>
+          </div>
+          <div class="logi-status-badge" id="logiWheelStatusBadge">
+            <span class="logi-dot"></span>
+            <span id="logiWheelStatusText">STANDARD-MODUS</span>
+          </div>
+        </div>
+
+        <!-- Die 16 physischen LED-Segmente -->
+        <div id="shiftLightBar" class="shift-lights-bar">
+          <!-- Wird per JS dynamisch mit 16 LEDs gefüllt -->
+        </div>
+
+        <div class="shift-hint-label" id="shiftActionHint">BEREIT</div>
+
+        <!-- LAUNCH CONTROL WIDGET & TIMER -->
+        <div id="launchControlWidget" class="launch-control-widget" style="display: none;">
+          <div class="launch-control-header">
+            <span class="launch-pulse-dot"></span>
+            <span class="launch-badge-tag">⚡ LAUNCH CONTROL</span>
+            <span class="launch-hint-tag">Kreis + Gas gedrückt halten</span>
+          </div>
+          <div class="launch-timer-display">
+            <span id="launchTimerVal" class="launch-timer-num">0.000</span>
+            <span class="launch-timer-unit">s</span>
+          </div>
+          <div id="launchStatusSub" class="launch-status-text">STAGING · DREHZAHL WIRD ANGEPASST</div>
+        </div>
+
+        <!-- LAUNCH CONTROL STATUS & PEDAL-KOMBI REGELN -->
+        <div class="lc-combo-bar" id="lcComboBar">
+          <div class="lc-combo-left">
+            <button id="lcToggleBtn" class="lc-status-pill lc-enabled" type="button" title="Klicken oder Pedal-Kombi zum Umschalten nutzen">
+              <span class="lc-pill-dot" id="lcPillDot"></span>
+              <span id="lcStatusPillText">⚡ LAUNCH CONTROL: BEREIT</span>
+            </button>
+          </div>
+          <div class="lc-combo-rules">
+            <span class="lc-rule-badge lc-rule-disable" title="4x schnell Kupplung treten zum Sperren">🚫 <b>4× Kupplung</b> = Sperren</span>
+            <span class="lc-rule-sep">•</span>
+            <span class="lc-rule-badge lc-rule-enable" title="2x Kupplung + 1x Bremse treten zum Aktivieren">⚡ <b>2× Kupplung + 1× Bremse</b> = Aktivieren</span>
+          </div>
+        </div>
+
+        <!-- Pop-Up Toast für Pedal-Kombi Benachrichtigung -->
+        <div id="lcToastBanner" class="lc-toast-banner" style="display: none;">
+          <span id="lcToastIcon" class="lc-toast-icon">⚡</span>
+          <div class="lc-toast-body">
+            <span id="lcToastTitle" class="lc-toast-title">LAUNCH CONTROL AKTIVIERT</span>
+            <span id="lcToastSub" class="lc-toast-sub">Kombi: 2x Kupplung + 1x Bremse</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSTRUMENT CLUSTER -->
+      <div class="cluster-grid">
+
+        <!-- LEFT WING: Pedals & Performance -->
+        <div class="cluster-card wing-left">
+          <div class="card-title">PEDALE & LEISTUNG</div>
+          
+          <!-- Throttle / Brake Vertical Bars -->
+          <div class="pedals-container">
+            <div class="pedal-gauge">
+              <div class="pedal-bar-track">
+                <div id="throttleBar" class="pedal-bar throttle" style="height: 0%;"></div>
+              </div>
+              <span class="pedal-label">GAS</span>
+              <span id="throttleVal" class="pedal-val">0%</span>
+            </div>
+            <div class="pedal-gauge">
+              <div class="pedal-bar-track">
+                <div id="brakeBar" class="pedal-bar brake" style="height: 0%;"></div>
+              </div>
+              <span class="pedal-label">BREMSE</span>
+              <span id="brakeVal" class="pedal-val">0%</span>
+            </div>
+            <div class="pedal-gauge clutch-gauge">
+              <div class="pedal-bar-track">
+                <div id="clutchBar" class="pedal-bar clutch" style="height: 0%;"></div>
+              </div>
+              <span class="pedal-label">KUPPL.</span>
+              <span id="clutchVal" class="pedal-val">0%</span>
+            </div>
+          </div>
+
+          <!-- Power & Boost -->
+          <div class="meta-stats-row">
+            <div class="stat-box">
+              <span class="stat-label">LADEDRUCK</span>
+              <span id="boostDisplay" class="stat-number">0.00 <small>BAR</small></span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">LEISTUNG</span>
+              <span id="powerDisplay" class="stat-number">0 <small>PS</small></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CENTER: Gear, Speed, Radial Sweep Gauge -->
+        <div class="cluster-card center-hero">
+          
+          <!-- Radial Sweep Arc SVG -->
+          <div class="radial-gauge-container">
+            <svg class="radial-svg" viewBox="0 0 300 300">
+              <circle class="radial-track" cx="150" cy="150" r="120" />
+              <circle id="radialRpmProgress" class="radial-progress" cx="150" cy="150" r="120" />
+            </svg>
+            
+            <!-- Central Main Gear -->
+            <div class="gear-hub" id="gearHub">
+              <span class="gear-title">GANG</span>
+              <span id="gearDisplay" class="gear-number">N</span>
+              <span id="gearIndicatorSub" class="gear-sub">NEUTRAL</span>
+            </div>
+          </div>
+
+          <!-- Speed Display -->
+          <div class="speed-container">
+            <span id="speedValue" class="speed-number">0</span>
+            <span id="speedUnit" class="speed-unit">KM/H</span>
+          </div>
+        </div>
+
+        <!-- RIGHT WING: Tires, Slip & G-Meter -->
+        <div class="cluster-card wing-right">
+          <div class="card-title">REIFEN & G-KRÄFTE</div>
+
+          <!-- Reifenmischung & Anzeige -->
+          <div class="tyre-dashboard-card">
+            <div class="tyre-hero-row">
+              <div class="tyre-hero-left">
+                <span class="tyre-hero-tag">MONTIERTE REIFEN</span>
+                <span id="tyreBadge" class="tyre-badge-large">Semi-Slick</span>
+              </div>
+              <div class="tyre-hero-right">
+                <span id="tyreRange" class="tyre-temp-window">Ideal: 80–105 °C</span>
+                <span id="tyreStatus" class="tyre-status tyre-cold">Ø – °C</span>
+              </div>
+            </div>
+
+            <!-- Schnellauswahl Buttons -->
+            <div class="tyre-pills-selector" id="tyrePillsContainer">
+              <!-- Dynamisch erzeugt mit interaktiven Pills -->
+            </div>
+            <select id="tyreSelect" style="display:none"></select>
+          </div>
+
+          <!-- 4-Tire Matrix -->
+          <div class="tire-matrix">
+            <div class="car-chassis-outline"></div>
+            
+            <div class="tire-node tire-fl" id="tireNodeFL">
+              <span class="tire-id">VL</span>
+              <span class="tire-temp" id="tireTempFL">20°C</span>
+              <div class="slip-indicator" id="tireSlipFL">GRIP</div>
+            </div>
+            
+            <div class="tire-node tire-fr" id="tireNodeFR">
+              <span class="tire-id">VR</span>
+              <span class="tire-temp" id="tireTempFR">20°C</span>
+              <div class="slip-indicator" id="tireSlipFR">GRIP</div>
+            </div>
+
+            <div class="tire-node tire-rl" id="tireNodeRL">
+              <span class="tire-id">HL</span>
+              <span class="tire-temp" id="tireTempRL">20°C</span>
+              <div class="slip-indicator" id="tireSlipRL">GRIP</div>
+            </div>
+
+            <div class="tire-node tire-rr" id="tireNodeRR">
+              <span class="tire-id">HR</span>
+              <span class="tire-temp" id="tireTempRR">20°C</span>
+              <div class="slip-indicator" id="tireSlipRR">GRIP</div>
+            </div>
+          </div>
+
+          <!-- G-Meter -->
+          <div class="g-meter-wrapper">
+            <div class="g-meter-box">
+              <div class="g-crosshair-h"></div>
+              <div class="g-crosshair-v"></div>
+              <div class="g-circle"></div>
+              <div id="gBall" class="g-ball"></div>
+            </div>
+            <div class="g-stats">
+              <span>LAT: <b id="gLatVal">0.00 G</b></span>
+              <span>LONG: <b id="gLongVal">0.00 G</b></span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- 2. SETTINGS / CONFIGURATION VIEW -->
+    <section id="settingsView" class="view-panel">
+      
+      <div class="settings-grid">
+
+        <!-- Column 1: Shift Light Verhalten -->
+        <div class="settings-card">
+          <h2 class="section-title">💡 Shift Light Verhalten</h2>
+
+          <div class="form-group">
+            <label for="fillPatternSelect">Füllmuster (LED-Animation):</label>
+            <select id="fillPatternSelect" class="form-select">
+              <option value="outside-in">Outside-In (GT3 Rennwagen - von außen nach innen)</option>
+              <option value="centre-out">Centre-Out (Logitech G923 / G29 - von innen nach außen)</option>
+              <option value="f1">Formula 1 (5x Grün -> 5x Rot -> 5x Blau)</option>
+              <option value="left-right">Sequentiell (Links nach Rechts)</option>
+              <option value="solid">Solid Flash (Alle blinken als Block)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>LED Start-Schwelle (% Drehzahl):</label>
+              <span id="startRpmVal" class="highlight-val">55 %</span>
+            </div>
+            <input type="range" id="startRpmSlider" min="20" max="80" value="55" class="slider">
+            <small>Ab wie viel % der Motordrehzahl die ersten LEDs aufleuchten.</small>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Warn-Farbumschlag (% Drehzahl):</label>
+              <span id="warnRpmVal" class="highlight-val">75 %</span>
+            </div>
+            <input type="range" id="warnRpmSlider" min="40" max="90" value="75" class="slider">
+            <small>Wechsel von Grün zu Gelb/Rot.</small>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Schaltblitz / Shift Point (% Drehzahl):</label>
+              <span id="shiftPointVal" class="highlight-val">88 %</span>
+            </div>
+            <input type="range" id="shiftPointSlider" min="70" max="98" value="88" class="slider">
+            <small>Optimaler Schaltmoment: Alle LEDs blinken als Schaltaufforderung!</small>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Blinkfrequenz des Schaltblitzes:</label>
+              <span id="blinkFreqVal" class="highlight-val">10 Hz</span>
+            </div>
+            <input type="range" id="blinkFreqSlider" min="4" max="25" value="10" class="slider">
+            <small>Geschwindigkeit des Blinkens bei Höchstdrehzahl.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="blinkStyleSelect">Blink-Art:</label>
+            <select id="blinkStyleSelect" class="form-select">
+              <option value="all">Alle LEDs synchron blinken</option>
+              <option value="redline-only">Nur die letzten roten LEDs blinken</option>
+              <option value="strobe">Stroboskop-Wechselblinken</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Column 2: Motorsport Sound (Audio Shift Beep) -->
+        <div class="settings-card">
+          <h2 class="section-title">🔊 Audio Shift Beep (Motorsport Ton)</h2>
+          <p class="card-desc">Wie im echten Rennwagen: Hörbarer Piepton auf den Kopfhörern genau beim perfekten Schaltpunkt!</p>
+
+          <div class="form-group checkbox-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="audioBeepEnabled" checked>
+              <span class="switch-slider"></span>
+            </label>
+            <span>Akustischen Schaltblitz aktivieren</span>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Tonhöhe / Frequenz (Hz):</label>
+              <span id="audioFreqVal" class="highlight-val">1800 Hz</span>
+            </div>
+            <input type="range" id="audioFreqSlider" min="800" max="3000" step="50" value="1800" class="slider">
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Ton-Dauer (ms):</label>
+              <span id="audioDurationVal" class="highlight-val">80 ms</span>
+            </div>
+            <input type="range" id="audioDurationSlider" min="30" max="250" step="10" value="80" class="slider">
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Lautstärke:</label>
+              <span id="audioVolVal" class="highlight-val">70 %</span>
+            </div>
+            <input type="range" id="audioVolSlider" min="5" max="100" value="70" class="slider">
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="limiterMultiBeep" checked>
+              <span class="switch-slider"></span>
+            </label>
+            <span>🚨 Limiter-Alarm: Mehrmals schnell piepsen im Drehzahlbegrenzer</span>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Limiter Pieps-Geschwindigkeit (ms):</label>
+              <span id="limiterSpeedVal" class="highlight-val">110 ms</span>
+            </div>
+            <input type="range" id="limiterSpeedSlider" min="60" max="250" step="10" value="110" class="slider">
+            <small>Wie schnell hintereinander der Piepton schlägt, wenn du im Begrenzer hängst.</small>
+          </div>
+
+          <button id="testAudioBtn" class="btn btn-secondary full-width">
+            🎵 Test-Beep abspielen
+          </button>
+        </div>
+
+        <!-- Column 3: Display, Einheiten & Verbindung -->
+        <div class="settings-card">
+          <h2 class="section-title">🏎️ Anzeige & Netzwerk</h2>
+
+          <div class="form-group">
+            <label>Geschwindigkeitseinheit:</label>
+            <div class="radio-pill-group">
+              <label><input type="radio" name="speedUnitRadio" value="kmh" checked> km/h</label>
+              <label><input type="radio" name="speedUnitRadio" value="mph"> mph</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Temperatureinheit:</label>
+            <div class="radio-pill-group">
+              <label><input type="radio" name="tempUnitRadio" value="c" checked> °Celsius</label>
+              <label><input type="radio" name="tempUnitRadio" value="f"> °Fahrenheit</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>LED Leuchtkraft & Bloom-Effekt:</label>
+              <span id="ledBrightnessVal" class="highlight-val">100 %</span>
+            </div>
+            <input type="range" id="ledBrightnessSlider" min="40" max="150" value="100" class="slider">
+          </div>
+
+          <div class="form-group checkbox-group" style="margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+            <label class="toggle-switch">
+              <input type="checkbox" id="wheelHardwareEnabled" checked>
+              <span class="switch-slider"></span>
+            </label>
+            <span>🎮 Logitech G29 / G923 Hardware-LEDs ansteuern</span>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Lenkrad LED Start-Schwelle:</label>
+              <span id="wheelStartRpmVal" class="highlight-val">50 %</span>
+            </div>
+            <input type="range" id="wheelStartRpmSlider" min="25" max="75" value="50" class="slider">
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Lenkrad Schaltblitz / Blink-Schwelle:</label>
+              <span id="wheelShiftVal" class="highlight-val">88 %</span>
+            </div>
+            <input type="range" id="wheelShiftSlider" min="70" max="98" value="88" class="slider">
+          </div>
+
+          <div class="form-group">
+            <label for="wheelFillSelect">Lenkrad Füllmuster:</label>
+            <select id="wheelFillSelect" class="form-select">
+              <option value="left-right">Links → Rechts</option>
+              <option value="right-left">Rechts → Links</option>
+              <option value="centre-out">Mitte → Außen</option>
+              <option value="outside-in">Außen → Mitte</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-val">
+              <label>Lenkrad Blinktempo im Begrenzer:</label>
+              <span id="wheelBlinkVal" class="highlight-val">12 Hz</span>
+            </div>
+            <input type="range" id="wheelBlinkSlider" min="3" max="25" value="12" class="slider">
+          </div>
+
+          <div class="form-group">
+            <div id="wheelStatusPill" class="status-pill waiting" style="display:inline-flex; margin-bottom:10px;">
+              <span class="status-dot"></span>
+              <span id="wheelStatusText">Lenkrad-Bridge: prüfe ...</span>
+            </div>
+            <button id="wheelTestBtn" class="btn btn-secondary full-width">
+              💡 LED-Test am Lenkrad (Lauflicht)
+            </button>
+            <small>Zeigt sofort, ob die RPM-Lichter am Lenkrad auf die Webseite reagieren.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="udpPortInput">Forza UDP Port:</label>
+            <div class="input-with-btn">
+              <input type="number" id="udpPortInput" value="5300" class="form-input">
+              <button id="savePortBtn" class="btn btn-secondary">Speichern</button>
+            </div>
+            <small>Muss mit den Telemetrie-Einstellungen im Spiel übereinstimmen (Standard: 5300).</small>
+          </div>
+
+          <div class="profile-actions-box">
+            <button id="saveProfileBtn" class="btn btn-primary full-width">💾 Als neues Profil speichern</button>
+            <button id="resetProfileBtn" class="btn btn-secondary full-width">↺ Auf Werkseinstellungen zurücksetzen</button>
+            <button id="deleteProfileBtn" class="btn btn-secondary full-width" style="display:none">🗑 Eigenes Profil löschen</button>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    <span>ApexShift Pro • Entwickelt für Forza Horizon 4, 5, 6 & Motorsport</span>
+    <span class="footer-tip">Tipp: Öffne diese Seite auf deinem Smartphone oder 2. Bildschirm für dein Cockpit!</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

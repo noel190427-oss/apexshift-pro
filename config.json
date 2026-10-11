@@ -1,0 +1,37 @@
+{
+  "port": 5300,
+  "wheelHardware": true,
+  "wheelStartRpm": 50,
+  "wheelShift": 93,
+  "wheelFill": "centre-out",
+  "wheelBlinkHz": 20,
+  "wheelTest": 1791744916971,
+  "profile": "custom_h",
+  "tyre": "semi-slick",
+  "customProfiles": {
+    "custom_h": {
+      "limiterMultiBeep": true,
+      "limiterSpeed": 110,
+      "name": "h",
+      "pattern": "solid",
+      "startRpm": 20,
+      "warnRpm": 82,
+      "shiftPoint": 93,
+      "blinkFreq": 20,
+      "blinkStyle": "all",
+      "audioEnabled": true,
+      "audioFreq": 2100,
+      "audioDuration": 50,
+      "audioVol": 85,
+      "ledBloom": 1.4,
+      "wheelFill": "centre-out",
+      "wheelStartRpm": 50,
+      "wheelShift": 93,
+      "wheelBlinkHz": 20,
+      "tyre": "slick"
+    }
+  },
+  "launchControlActive": false,
+  "launchControlEnabled": false,
+  "launchTargetRpm": 65
+}

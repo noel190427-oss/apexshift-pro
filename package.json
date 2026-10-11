@@ -1,0 +1,23 @@
+{
+  "name": "apexshift-pro",
+  "version": "1.0.0",
+  "description": "Professional telemetry dashboard, launch control suite and Logitech G923/G29 hardware RPM shift-light bridge for Forza Horizon 4/5 and Forza Motorsport.",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "keywords": [
+    "forza",
+    "forza-horizon-5",
+    "telemetry",
+    "logitech-g29",
+    "logitech-g923",
+    "shift-light",
+    "dashboard",
+    "sim-racing",
+    "raspberry-pi"
+  ],
+  "author": "Noel",
+  "license": "MIT"
+}
