@@ -290,12 +290,12 @@ def config_thread():
 # ------------------------------------------------------------
 # LED-Logik
 # ------------------------------------------------------------
-# Schritte, in denen sich die LEDs füllen (Bit0 = linke LED ... Bit4 = rechte LED)
+# Schritte, in denen sich die LEDs füllen (Bit0 = aeusseres Paar ... Bit4 = mittleres Paar (10 LEDs, gespiegelt))
 FILL_STEPS = {
     "left-right":  [0b00001, 0b00011, 0b00111, 0b01111, 0b11111],
     "right-left":  [0b10000, 0b11000, 0b11100, 0b11110, 0b11111],
-    "centre-out":  [0b00100, 0b01110, 0b11111],
-    "outside-in":  [0b10001, 0b11011, 0b11111],
+    "centre-out":  [0b10000, 0b11000, 0b11100, 0b11110, 0b11111],
+    "outside-in":  [0b00001, 0b00011, 0b00111, 0b01111, 0b11111],
 }
 FULL = 0b11111
 

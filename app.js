@@ -761,15 +761,15 @@ function updateShiftLights(rpmPct) {
 const LOGI_FILL_STEPS = {
   'left-right': [0b00001, 0b00011, 0b00111, 0b01111, 0b11111],
   'right-left': [0b10000, 0b11000, 0b11100, 0b11110, 0b11111],
-  'centre-out': [0b00100, 0b01110, 0b11111],
-  'outside-in': [0b10001, 0b11011, 0b11111],
+  'centre-out': [0b10000, 0b11000, 0b11100, 0b11110, 0b11111],
+  'outside-in': [0b00001, 0b00011, 0b00111, 0b01111, 0b11111],
   'f1':         [0b00001, 0b00011, 0b00111, 0b01111, 0b11111],
   'solid':      [0b00001, 0b00011, 0b00111, 0b01111, 0b11111]
 };
 
 function updateLogitechWheelLeds(rpmPct, isShiftZone) {
-  if (!logiLed0 || !logiLed1 || !logiLed2 || !logiLed3 || !logiLed4) return;
-  const leds = [logiLed0, logiLed1, logiLed2, logiLed3, logiLed4];
+  const leds = document.querySelectorAll('#logiLedsCluster .logi-led');
+  if (!leds.length) return;
 
   let mask = 0;
   const wheelStart = Number(activeConfig.wheelStartRpm) || 50;
@@ -812,11 +812,12 @@ function updateLogitechWheelLeds(rpmPct, isShiftZone) {
     if (logiLedsCluster) logiLedsCluster.classList.remove('redline-flash');
   }
 
-  // Masken-Bits (Bit 0 = LED0 links ... Bit 4 = LED4 rechts) auf DOM anwenden
-  for (let i = 0; i < 5; i++) {
-    const isLit = (mask & (1 << i)) !== 0;
-    leds[i].classList.toggle('lit', isLit);
-  }
+  // Das Lenkrad hat 10 LEDs, die als 5 gespiegelte Paare angesteuert werden:
+  // Bit 0 = aeusserstes Paar (gruen) ... Bit 4 = mittleres Paar (blau)
+  leds.forEach((el, j) => {
+    const bit = Math.min(j, leds.length - 1 - j);
+    el.classList.toggle('lit', (mask & (1 << bit)) !== 0);
+  });
 }
 
 // ------------------------------------------------------------

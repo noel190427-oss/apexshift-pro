@@ -396,7 +396,7 @@ body {
 .logi-leds-cluster {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.7);
   padding: 6px 16px;
   border-radius: 20px;
@@ -446,6 +446,13 @@ body {
   background: #ff1a3c;
   border-color: #ff8093;
   box-shadow: 0 0 16px #ff1a3c, 0 0 30px rgba(255, 26, 60, 0.8);
+}
+
+/* Blaue LEDs (Mitte) */
+.logi-led.logi-blue.lit {
+  background: #2d7bff;
+  border-color: #8ab8ff;
+  box-shadow: 0 0 14px #2d7bff, 0 0 26px rgba(45, 123, 255, 0.7);
 }
 
 /* Redline-Flash auf allen LEDs */
