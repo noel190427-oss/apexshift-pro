@@ -1,0 +1,16 @@
+{
+  "name": "ApexShift Pro",
+  "short_name": "ApexShift",
+  "description": "Forza Telemetry & Shift Light Suite",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0d111a",
+  "theme_color": "#00f0ff",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
