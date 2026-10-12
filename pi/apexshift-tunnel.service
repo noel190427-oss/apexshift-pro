@@ -1,0 +1,14 @@
+[Unit]
+Description=ApexShift Pro public HTTPS tunnel (Cloudflare Quick Tunnel)
+After=network-online.target apexshift.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=noel
+ExecStart=/bin/bash /home/noel/apexshift-server/pi/apexshift-tunnel.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -3,9 +3,9 @@
   "wheelHardware": true,
   "wheelStartRpm": 50,
   "wheelShift": 93,
-  "wheelFill": "centre-out",
-  "wheelBlinkHz": 20,
-  "wheelTest": 1791805996249,
+  "wheelFill": "outside-in",
+  "wheelBlinkHz": 25,
+  "wheelTest": 1791806175578,
   "profile": "custom_h",
   "tyre": "semi-slick",
   "customProfiles": {
@@ -32,6 +32,6 @@
     }
   },
   "launchControlActive": false,
-  "launchControlEnabled": false,
+  "launchControlEnabled": true,
   "launchTargetRpm": 65
 }
