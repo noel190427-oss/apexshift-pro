@@ -4,6 +4,7 @@
 // ============================================================
 
 import http from 'node:http';
+import https from 'node:https';
 import dgram from 'node:dgram';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,6 +27,18 @@ function getServerIps() {
   }
   return results.length > 0 ? results : ['127.0.0.1'];
 }
+
+// Öffentliche IP (für Spieler außerhalb des Heimnetzes, z. B. Xbox in einer anderen Stadt)
+let publicIp = '';
+function refreshPublicIp() {
+  https.get('https://api.ipify.org', { timeout: 8000 }, (r) => {
+    let d = '';
+    r.on('data', c => { d += c; });
+    r.on('end', () => { if (/^[0-9a-fA-F:.]{3,45}$/.test(d.trim())) publicIp = d.trim(); });
+  }).on('error', () => {}).on('timeout', function () { this.destroy(); });
+}
+refreshPublicIp();
+setInterval(refreshPublicIp, 10 * 60 * 1000);
 
 // Konfiguration (wird in config.json gespeichert und beim Start geladen)
 const CONFIG_FILE = path.join(__dirname, 'config.json');
@@ -445,6 +458,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({
       primaryIp: bestIp,
+      publicIp: publicIp,
       allIps: ips,
       udpPort: udpPort,
       httpPort: httpPort,

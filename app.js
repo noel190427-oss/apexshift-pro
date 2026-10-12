@@ -75,7 +75,24 @@ let webConfigLoaded = false;   // erst nach dem Laden vom Server automatisch spe
 
 // Server-Adresse Management (Für Zugriff aus anderer Stadt / lokal / Pi)
 const IS_GITHUB_PAGES = window.location.hostname.includes('github.io');
-let customServerBase = localStorage.getItem('apexshift_server_url') || (IS_GITHUB_PAGES ? 'http://192.168.2.124:5305' : '');
+let customServerBase = localStorage.getItem('apexshift_server_url') || '';
+let publicServerInfo = null;   // {url, publicIp, udpPort} aus server.json (vom Pi veröffentlicht)
+
+// Auf GitHub Pages: öffentliche Server-Adresse (HTTPS-Tunnel zum Pi) automatisch laden
+async function resolvePublicServer(force) {
+  if (!IS_GITHUB_PAGES) return;
+  const stored = localStorage.getItem('apexshift_server_url') || '';
+  if (!force && stored && !stored.includes('192.168.')) return;   // eigene Wahl behalten
+  try {
+    const r = await fetch('server.json?t=' + Date.now(), { cache: 'no-store' });
+    const j = await r.json();
+    if (j && j.url) {
+      publicServerInfo = j;
+      customServerBase = j.url;
+      localStorage.removeItem('apexshift_server_url');
+    }
+  } catch (_) { /* server.json noch nicht vorhanden */ }
+}
 
 function getApiBaseUrl() {
   if (customServerBase && customServerBase !== 'auto') {
@@ -1705,8 +1722,12 @@ async function loadServerInfo() {
     if (!res.ok) throw new Error('Not available');
     const info = await res.json();
 
-    if (ipEl && info.primaryIp) {
-      ipEl.textContent = info.primaryIp;
+    const host = window.location.hostname;
+    const isLocalHost = host === 'localhost' || host.startsWith('127.') || host.startsWith('192.168.') || host.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+    const shownIp = (!isLocalHost && info.publicIp) ? info.publicIp : info.primaryIp;
+    info.primaryIp = shownIp;
+    if (ipEl && shownIp) {
+      ipEl.textContent = shownIp;
     }
     if (portEl && info.udpPort) {
       portEl.textContent = info.udpPort;
@@ -1718,7 +1739,7 @@ async function loadServerInfo() {
     setupCopyButtons(info.primaryIp, info.udpPort);
   } catch (_) {
     // Fallback wenn kein Backend direkt auf dieser Domain läuft (z.B. GitHub Pages)
-    const fallbackIp = isGitHubPages ? '192.168.2.124' : (window.location.hostname || '127.0.0.1');
+    const fallbackIp = (publicServerInfo && publicServerInfo.publicIp) ? publicServerInfo.publicIp : (isGitHubPages ? 'Server wird gesucht ...' : (window.location.hostname || '127.0.0.1'));
     const fallbackPort = 5300;
     if (ipEl) ipEl.textContent = fallbackIp;
     if (portEl) portEl.textContent = fallbackPort;
@@ -1777,6 +1798,8 @@ function setupServerPicker() {
   const updateLabel = () => {
     if (!customServerBase || customServerBase === 'auto') {
       label.textContent = 'Server: Auto';
+    } else if (publicServerInfo && customServerBase === publicServerInfo.url) {
+      label.textContent = 'Server: Öffentlich (Pi)';
     } else if (customServerBase.includes('192.168.2.124')) {
       label.textContent = 'Server: Pi (192.168.2.124)';
     } else if (customServerBase.includes('localhost') || customServerBase.includes('127.0.0.1')) {
@@ -1826,6 +1849,12 @@ function setupServerPicker() {
   document.querySelectorAll('.btn-preset').forEach(preset => {
     preset.addEventListener('click', () => {
       const targetUrl = preset.dataset.url;
+      if (targetUrl === 'public') {
+        localStorage.removeItem('apexshift_server_url');
+        resolvePublicServer(true).then(() => { updateLabel(); reconnectAll(); });
+        dropdown.classList.add('hidden');
+        return;
+      }
       customServerBase = targetUrl;
       localStorage.setItem('apexshift_server_url', targetUrl);
       updateLabel();
@@ -1862,7 +1891,8 @@ function reconnectAll() {
 // ------------------------------------------------------------
 // 10. STARTUP
 // ------------------------------------------------------------
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  await resolvePublicServer(false);
   initShiftLightLeds();
   initTyrePills();
   setupEventListeners();
